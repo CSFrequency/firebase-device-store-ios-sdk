@@ -1,10 +1,3 @@
-//
-//  FirebaseDeviceStore.swift
-//  FirebaseDeviceStore
-//
-//  Copyright © 2019 CSFrequency Limited. All rights reserved.
-//
-
 import Foundation
 import UserNotifications
 
@@ -23,27 +16,27 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
     private let OS_FIELD: String = "os";
     private let TYPE_FIELD: String = "type";
     private let USER_ID_FIELD: String = "userId";
-    
+
     private let auth: Auth
     private let collectionPath: String
     private let firestore: Firestore
     private let instanceId: InstanceID
-    
+
     private var authSubscription: AuthStateDidChangeListenerHandle?;
     private var currentToken: String?
     private var currentUser: User?
     private var subscribed: Bool = false
-    
+
     public init(app: FirebaseApp, collectionPath: String = "user-devices") {
         self.auth = Auth.auth(app: app);
         self.collectionPath = collectionPath;
         self.firestore = Firestore.firestore(app: app);
         self.instanceId = InstanceID.instanceID();
-        
+
         super.init();
         Messaging.messaging().delegate = self;
     }
-    
+
     // FIRMessaging delegate implementation
     public func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String) {
         // Ifnore token changes if the store isn't subscribed
@@ -57,7 +50,7 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
         // Update the cached token
         currentToken = fcmToken;
     }
-    
+
     public func signOut() {
         if (currentUser != nil && currentToken != nil) {
             deleteDevice(currentUser!.uid);
@@ -65,12 +58,12 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
         // Clear the cached user
         currentUser = nil;
     }
-    
+
     public func subscribe(_ handler: @escaping (Bool) -> Void) {
         if (subscribed) {
             return;
         }
-        
+
         // Check notification permissions
         let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
         UNUserNotificationCenter.current().requestAuthorization(options: authOptions) { (authorized, error) in
@@ -82,39 +75,39 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
             }
         }
     }
-    
+
     private func doSubscribe() {
         subscribed = true;
-        
+
         currentUser = auth.currentUser;
-        
+
         instanceId.instanceID { (result, error) in
             if (error != nil) {
                 // TODO: Logging
             } else if (result != nil) {
                 self.currentToken = result!.token;
-                
+
                 if (self.currentToken != nil && self.currentUser != nil) {
                     self.updateDevice(self.currentUser!.uid, self.currentToken!);
                 }
             }
         }
-        
+
         authSubscription = auth.addStateDidChangeListener { (auth, user) in
             if (user != nil && self.currentUser == nil && self.currentToken != nil) {
                 self.currentUser = user;
-                
+
                 self.updateDevice(self.currentUser!.uid, self.currentToken!);
             } else if (user == nil && self.currentUser != nil) {
                 // TODO: Log Warning
                 // You need to call the `logout` method on the DeviceStore before logging out the user
-                
+
                 // Clear the cached user
                 self.currentUser = user;
             }
         }
     }
-    
+
     public func unsubscribe() {
         if (authSubscription != nil) {
             auth.removeStateDidChangeListener(authSubscription!);
@@ -126,10 +119,10 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
         // Clear subscription flag
         subscribed = false;
     }
-    
+
     private func deleteDevice(_ userId: String) {
         let docRef = userRef(userId);
-        
+
         firestore.runTransaction({ (transaction, errorPointer) -> Any? in
             let doc: DocumentSnapshot;
             do {
@@ -138,7 +131,7 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
                 errorPointer?.pointee = fetchError
                 return nil;
             }
-            
+
             if (doc.exists) {
                 var devices = self.getDevices(doc);
                 // Remove the old device
@@ -154,10 +147,10 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
             // TODO: Logging
         }
     }
-    
+
     private func updateDevice(_ userId: String, _ token: String) {
         let docRef = userRef(userId);
-        
+
         firestore.runTransaction({ (transaction, errorPointer) -> Any? in
             let doc: DocumentSnapshot;
             do {
@@ -185,7 +178,7 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
             // TODO: Logging
         }
     }
-    
+
     private func containsCurrentDevice(_ devices: [[String: String]]) -> Bool {
         let deviceId = getDeviceId();
         for device in devices {
@@ -195,7 +188,7 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
         }
         return false;
     }
-    
+
     private func createCurrentDevice(_ token: String) -> [String: String] {
         let device: [String: String] = [
             DEVICE_ID_FIELD: getDeviceId(),
@@ -206,7 +199,7 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
         ];
         return device;
     }
-    
+
     private func createUserDevices(_ userId: String, _ token: String?) -> [String: Any] {
         let userDevices: [String: Any] = [
             DEVICES_FIELD: token == nil ? [] : [createCurrentDevice(token!)],
@@ -214,31 +207,31 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
         ];
         return userDevices;
     }
-    
+
     private func getDeviceId() -> String {
         return UIDevice.current.identifierForVendor!.uuidString;
     }
-    
+
     private func getDevices(_ snapshot: DocumentSnapshot) -> [[String: String]] {
         let devices: [[String: String]]? = snapshot.get(DEVICES_FIELD) as? [[String : String]];
         return devices ?? [];
     }
-    
+
     private func getDeviceName() -> String {
         return UIDevice.current.name;
     }
-    
+
     private func getOS() -> String {
         return "iOS " + UIDevice.current.systemVersion;
     }
-    
+
     private func removeCurrentDevice(_ devices: [[String: String]]) -> [[String: String]] {
         let deviceId = getDeviceId();
         return devices.filter({ (device: [String : String]) -> Bool in
             return deviceId != device[DEVICE_ID_FIELD];
         })
     }
-    
+
     private func updateCurrentDevice(_ devices: [[String: String]], _ token: String) {
         let deviceId = getDeviceId();
         for var device in devices {
@@ -247,7 +240,7 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
             }
         }
     }
-    
+
     private func userRef(_ userId: String) -> DocumentReference {
         return firestore.collection(collectionPath).document(userId);
     }
