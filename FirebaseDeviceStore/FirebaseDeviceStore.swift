@@ -6,11 +6,15 @@
 //
 
 import Foundation
+import UserNotifications
+
 import FirebaseAuth
 import FirebaseCore
 import FirebaseFirestore
+import FirebaseInstanceID
+import FirebaseMessaging
 
-public class FirebaseDeviceStore {
+public class FirebaseDeviceStore: NSObject, MessagingDelegate {
     private let DEFAULT_COLLECTION_PATH: String = "user-devices"
     private let DEVICE_ID_FIELD: String = "deviceId"
     private let DEVICES_FIELD: String = "devices"
@@ -23,6 +27,7 @@ public class FirebaseDeviceStore {
     private let auth: Auth
     private let collectionPath: String
     private let firestore: Firestore
+    private let instanceId: InstanceID
     
     private var authSubscription: AuthStateDidChangeListenerHandle?;
     private var currentToken: String?
@@ -33,6 +38,24 @@ public class FirebaseDeviceStore {
         self.auth = Auth.auth(app: app);
         self.collectionPath = collectionPath;
         self.firestore = Firestore.firestore(app: app);
+        self.instanceId = InstanceID.instanceID();
+        
+        super.init();
+        Messaging.messaging().delegate = self;
+    }
+    
+    // FIRMessaging delegate implementation
+    public func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String) {
+        // Ifnore token changes if the store isn't subscribed
+        if (!subscribed) {
+            return;
+        }
+        // If the token has changed, then update it
+        if (fcmToken != currentToken && currentUser != nil) {
+            updateDevice(currentUser!.uid, fcmToken);
+        }
+        // Update the cached token
+        currentToken = fcmToken;
     }
     
     public func signOut() {
@@ -43,18 +66,39 @@ public class FirebaseDeviceStore {
         currentUser = nil;
     }
     
-    public func subscribe() {
+    public func subscribe(_ handler: @escaping (Bool) -> Void) {
         if (subscribed) {
             return;
         }
         
-        // TODO: Check permissions
-        
+        // Check notification permissions
+        let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
+        UNUserNotificationCenter.current().requestAuthorization(options: authOptions) { (authorized, error) in
+            if (!authorized) {
+                handler(false);
+            } else {
+                self.doSubscribe();
+                handler(true);
+            }
+        }
+    }
+    
+    private func doSubscribe() {
         subscribed = true;
         
         currentUser = auth.currentUser;
         
-        // TODO: Load the current FCM token
+        instanceId.instanceID { (result, error) in
+            if (error != nil) {
+                // TODO: Logging
+            } else if (result != nil) {
+                self.currentToken = result!.token;
+                
+                if (self.currentToken != nil && self.currentUser != nil) {
+                    self.updateDevice(self.currentUser!.uid, self.currentToken!);
+                }
+            }
+        }
         
         authSubscription = auth.addStateDidChangeListener { (auth, user) in
             if (user != nil && self.currentUser == nil && self.currentToken != nil) {
