@@ -28,6 +28,7 @@ A Document is created in the Cloud Firestore collection for each logged in user:
 
 The structure of this Document is as follows:
 
+TODO: As explained in my TODO in the code, I think things would be much simpler if devices was a map instead of an array.
 ```
 {
   devices: Device[],
@@ -66,6 +67,7 @@ Indicate to the DeviceStore that the user is about to sign out, and the current 
 
 This cannot be done automatically with `onAuthStateChanged` as the user won't have permission to remove the token from Firestore as they are already signed out by this point and the Cloud Firestore security rules will prevent the database deletion.
 
+TODO: From the code it looks like this takes a 'handler' callback that isn't documented here?
 #### `FirebaseDeviceStore.subscribe(): void`
 
 Subscribe a device store to the Firebase App. This will:

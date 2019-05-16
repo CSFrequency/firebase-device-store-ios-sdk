@@ -34,6 +34,8 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
         self.instanceId = InstanceID.instanceID();
 
         super.init();
+        // TODO: Is this going to prevent the developer from setting a Messaging delegate (and
+        // therefore from implementing didReceiveMessage, etc.)?
         Messaging.messaging().delegate = self;
     }
 
@@ -123,8 +125,21 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
     private func deleteDevice(_ userId: String) {
         let docRef = userRef(userId);
 
+        // TODO: Rather than store a 'devices' array, you could store it as a map:
+        // devices: {
+        //   deviceId1: { },
+        //   deviceID2: { },
+        //   ...
+        // }
+        //
+        // And then to delete you don't need to use a transaction and you can just do
+        // docRef.updateData(FieldPath.of(self.DEVICES_FIELD, getDeviceId()), FieldValue.delete());
+
         firestore.runTransaction({ (transaction, errorPointer) -> Any? in
             let doc: DocumentSnapshot;
+            // TODO: Is this do/catch block necessary? I think if you just let the exception bubble
+            // up to Firestore, then it'll cancel the transaction and propagate the error
+            // automatically.
             do {
                 try doc = transaction.getDocument(docRef);
             } catch let fetchError as NSError {
@@ -148,6 +163,8 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
         }
     }
 
+    // TODO: Similar to above, if devices were stored as a map, this could be something like:
+    // docRef.updateData(FieldPath.of(self.DEVICES_FIELD, getDeviceId()), self.createCurrentDevice(token));
     private func updateDevice(_ userId: String, _ token: String) {
         let docRef = userRef(userId);
 
