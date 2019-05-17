@@ -39,7 +39,7 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
 
     // FIRMessaging delegate implementation
     public func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String) {
-        // Ifnore token changes if the store isn't subscribed
+        // Ignore token changes if the store isn't subscribed
         if (!subscribed) {
             return;
         }

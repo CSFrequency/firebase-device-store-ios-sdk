@@ -39,11 +39,11 @@ A `Device` object contains the following:
 
 ```
 {
-  deviceId: string, // The browser name and version
+  deviceId: string, // A UUID for the device
   fcmToken: string, // The FCM token
-  name: 'Unknown',  // Web browser's do not provide a name field
+  name: string,     // The name of the device (e.g. 'Bob's iPhone')
   os: string,       // The OS of the device
-  type: 'Web'
+  type: 'iOS'
 }
 ```
 
@@ -55,7 +55,7 @@ Create a new DeviceStore.
 
 Parameters:
 
-- `app`: `FirebaseApp` the Firebase App to use
+- `app`: `FirebaseApp` the Firebase App to use.
 - `collectionPath`: (Optional) `string` the Cloud Firestore collection where devices should be stored. Defaults to `user-devices`.
 
 Returns a `FirebaseDeviceStore`.
