@@ -39,11 +39,12 @@ A `Device` object contains the following:
 
 ```
 {
-  deviceId: string, // A UUID for the device
-  fcmToken: string, // The FCM token
-  name: string,     // The name of the device (e.g. 'Bob's iPhone')
-  os: string,       // The OS of the device
-  type: 'iOS'
+  devices: {
+    deviceId1: Device,
+    deviceId2: Device,
+    ...
+  },
+  userId: string,
 }
 ```
 
@@ -60,19 +61,28 @@ Parameters:
 
 Returns a `FirebaseDeviceStore`.
 
-#### `FirebaseDeviceStore.signOut(): void`
+#### `FirebaseDeviceStore.signOut(completion: (Bool, Error?) -> Void): void`
 
 Indicate to the DeviceStore that the user is about to sign out, and the current device token should be removed.
 
-This cannot be done automatically with `onAuthStateChanged` as the user won't have permission to remove the token from Firestore as they are already signed out by this point and the Cloud Firestore security rules will prevent the database deletion.
+This can't be done automatically with `onAuthStateChanged` as the user is already signed out at this point. This means the Cloud Firestore security rules will prevent the database deletion as they no longer have the correct user permissions to remove the token.
 
-#### `FirebaseDeviceStore.subscribe(): void`
+Parameters:
+
+- `completion`: `(Bool, Error?) -> Void` a callback handler which will return a `boolean` to indicate if the subscription succeed, as well as an `Error` if it did not
+
+#### `FirebaseDeviceStore.subscribe(completion: (Bool, Error?) -> Void): void`
 
 Subscribe a device store to the Firebase App. This will:
 
-1. Subscribe to Firebase Auth and listen to changes in authentication state
-2. Subscribe to Firebase Messaging and listen to changes in the FCM token
-3. Automatically store device and FCM token information in the Cloud Firestore collection you specify
+1. Request appropriate Notification permissions, if they have not already been granted
+2. Subscribe to Firebase Auth and listen to changes in authentication state
+3. Subscribe to Firebase Messaging and listen to changes in the FCM token
+4. Automatically store device and FCM token information in the Cloud Firestore collection you specify
+
+Parameters:
+
+- `completion`: `(Bool, Error?) -> Void` a callback handler which will return a `boolean` to indicate if the subscription succeed, as well as an `Error` if it did not
 
 #### `FirebaseDeviceStore.unsubscribe(): void`
 
