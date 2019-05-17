@@ -30,7 +30,11 @@ The structure of this Document is as follows:
 
 ```
 {
-  devices: Device[],
+  devices: {
+    deviceId1: Device,
+    deviceId2: Device,
+    ...
+  },
   userId: string,
 }
 ```
@@ -39,12 +43,11 @@ A `Device` object contains the following:
 
 ```
 {
-  devices: {
-    deviceId1: Device,
-    deviceId2: Device,
-    ...
-  },
-  userId: string,
+  deviceId: string, // A UUID for the device
+  fcmToken: string, // The FCM token
+  name: string,     // The name of the device (e.g. 'Bob's iPhone')
+  os: string,       // The OS of the device
+  type: 'iOS'
 }
 ```
 
