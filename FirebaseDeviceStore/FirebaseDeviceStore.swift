@@ -7,7 +7,7 @@ import FirebaseFirestore
 import FirebaseInstanceID
 import FirebaseMessaging
 
-public class FirebaseDeviceStore: NSObject, MessagingDelegate {
+@objc public class FirebaseDeviceStore: NSObject, MessagingDelegate {
     private let DEFAULT_COLLECTION_PATH: String = "user-devices"
     private let DEVICE_ID_FIELD: String = "deviceId"
     private let DEVICES_FIELD: String = "devices"
@@ -26,8 +26,12 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
     private var currentToken: String?
     private var currentUser: User?
     private var subscribed: Bool = false
-
-    public init(app: FirebaseApp, collectionPath: String = "user-devices") {
+    
+    @objc public convenience init(app: FirebaseApp) {
+        self.init(app: app, collectionPath:"user-devices");
+    }
+    
+    @objc public init(app: FirebaseApp, collectionPath: String) {
         self.auth = Auth.auth(app: app);
         self.collectionPath = collectionPath;
         self.firestore = Firestore.firestore(app: app);
@@ -52,24 +56,23 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
         currentToken = fcmToken;
     }
 
-    public func signOut(_ completion: @escaping (Bool, Error?) -> Void) {
+    @objc public func signOut(_ completion: @escaping (Error?) -> Void) {
         if (currentUser != nil && currentToken != nil) {
-            // Store the UID before we clear the user
+            // Store the UID before we clear the user and delete the device
             let uid = currentUser!.uid;
             currentUser = nil;
-            return deleteDevice(uid, completion: { (error) in
-                completion(error == nil, error);
-            });
+            deleteDevice(uid, completion: completion);
+        } else {
+            // Clear the cached user
+            currentUser = nil;
+            completion(nil);
         }
-        // Clear the cached user
-        currentUser = nil;
-        return completion(true, nil);
     }
 
-    public func subscribe(_ completion: @escaping (Bool, Error?) -> Void) {
+    @objc public func subscribe(_ completion: @escaping (Error?) -> Void) {
         // Prevent duplicate subscriptions
         if (subscribed) {
-            completion(true, nil);
+            completion(nil);
             return;
         }
 
@@ -77,14 +80,26 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
         let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
         UNUserNotificationCenter.current().requestAuthorization(options: authOptions) { (authorized, error) in
             if (!authorized) {
-                completion(false, error);
+                completion(error);
             } else {
                 self.doSubscribe();
-                completion(true, nil);
+                completion(nil);
             }
         }
     }
 
+    @objc public func unsubscribe() {
+        if (authSubscription != nil) {
+            auth.removeStateDidChangeListener(authSubscription!);
+            authSubscription = nil;
+        }
+        // Reset state
+        currentToken = nil;
+        currentUser = nil;
+        // Clear subscription flag
+        subscribed = false;
+    }
+    
     private func doSubscribe() {
         subscribed = true;
 
@@ -119,46 +134,15 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
         }
     }
 
-    public func unsubscribe() {
-        if (authSubscription != nil) {
-            auth.removeStateDidChangeListener(authSubscription!);
-            authSubscription = nil;
-        }
-        // Reset state
-        currentToken = nil;
-        currentUser = nil;
-        // Clear subscription flag
-        subscribed = false;
-    }
-
     private func deleteDevice(_ userId: String, completion: @escaping (Error?) -> Void) {
         let docRef = userRef(userId);
-
-        docRef.getDocument { (doc, error) in
-            if (doc != nil) {
-                if (doc!.exists) {
-                    return docRef.updateData([FieldPath.init([self.DEVICES_FIELD, self.getDeviceId()]): FieldValue.delete()], completion: completion);
-                }
-                return completion(nil);
-            }
-            return completion(error);
-        }
+        docRef.updateData([FieldPath.init([self.DEVICES_FIELD, self.getDeviceId()]): FieldValue.delete()], completion: completion);
     }
 
     private func updateDevice(_ userId: String, _ token: String, completion: @escaping (Error?) -> Void) {
         let docRef = userRef(userId);
-
-        docRef.getDocument { (doc, error) in
-            if (doc != nil) {
-                if (doc!.exists) {
-                    let deviceId = self.getDeviceId();
-                    return docRef.updateData([FieldPath.init([self.DEVICES_FIELD, self.getDeviceId()]): self.createDevice(deviceId, token)], completion: completion);
-                } else {
-                    return docRef.setData(self.createUserDevices(userId, token), completion: completion);
-                }
-            }
-            return completion(error);
-        }
+        let deviceId = self.getDeviceId();
+        docRef.setData([USER_ID_FIELD: userId, DEVICES_FIELD: [deviceId: self.createDevice(deviceId, token)]], merge: true, completion: completion);
     }
 
     private func createDevice(_ deviceId: String, _ token: String) -> [String: String] {

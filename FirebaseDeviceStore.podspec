@@ -81,7 +81,7 @@ Pod::Spec.new do |s|
   #  Supports git, hg, bzr, svn and HTTP.
   #
 
-  s.source       = { :git => "http://github.com/csfrequency/firebase-device-store-ios-sdk.git", :tag => "#{s.version}" }
+  s.source       = { :git => "https://github.com/csfrequency/firebase-device-store-ios-sdk.git", :tag => "#{s.version}" }
 
 
   # ――― Source Code ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――― #
@@ -92,7 +92,6 @@ Pod::Spec.new do |s|
   #  Not including the public_header_files will make all headers public.
   #
 
-  s.public_header_files = "FirebaseDeviceStore/*.h"
   s.source_files  = "FirebaseDeviceStore/*.{h,swift}"
 
 
