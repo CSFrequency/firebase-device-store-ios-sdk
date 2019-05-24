@@ -81,7 +81,7 @@ Pod::Spec.new do |s|
   #  Supports git, hg, bzr, svn and HTTP.
   #
 
-  s.source       = { :git => "https://github.com/csfrequency/firebase-device-store-ios-sdk.git", :tag => "#{s.version}" }
+  s.source       = { :git => "https://github.com/csfrequency/firebase-device-store-ios-sdk.git", :tag => "v#{s.version}" }
 
 
   # ――― Source Code ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――― #
