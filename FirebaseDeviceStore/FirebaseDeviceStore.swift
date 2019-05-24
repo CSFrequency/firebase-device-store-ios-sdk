@@ -7,7 +7,7 @@ import FirebaseFirestore
 import FirebaseInstanceID
 import FirebaseMessaging
 
-@objc public class FirebaseDeviceStore: NSObject, MessagingDelegate {
+@objc public class FirebaseDeviceStore: NSObject {
     private let DEFAULT_COLLECTION_PATH: String = "user-devices"
     private let DEVICE_ID_FIELD: String = "deviceId"
     private let DEVICES_FIELD: String = "devices"
@@ -38,22 +38,29 @@ import FirebaseMessaging
         self.instanceId = InstanceID.instanceID();
 
         super.init();
-        Messaging.messaging().delegate = self;
+        
+        let center = NotificationCenter.default
+        center.addObserver(self,
+                           selector: #selector(onFCMTokenRefreshed),
+                           name: Notification.Name.MessagingRegistrationTokenRefreshed,
+                           object: nil)
     }
-
-    // FIRMessaging delegate implementation
-    public func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String) {
+    
+    @objc func onFCMTokenRefreshed(_ notification:Notification) {
         // Ignore token changes if the store isn't subscribed
         if (!subscribed) {
             return;
         }
         
+        // Get the current token
+        let fcmToken = Messaging.messaging().fcmToken;
+        
         // If the token has changed, then update it
-        if (fcmToken != currentToken && currentUser != nil) {
-            updateDevice(currentUser!.uid, fcmToken, completion: {_ in });
+        if (fcmToken != nil && fcmToken != self.currentToken && self.currentUser != nil) {
+            updateDevice(self.currentUser!.uid, fcmToken!, completion: {_ in });
         }
         // Update the cached token
-        currentToken = fcmToken;
+        self.currentToken = fcmToken;
     }
 
     @objc public func signOut(_ completion: @escaping (Error?) -> Void) {
