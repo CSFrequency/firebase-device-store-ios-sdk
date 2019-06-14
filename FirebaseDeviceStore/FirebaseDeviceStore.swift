@@ -27,6 +27,10 @@ import FirebaseMessaging
     private var currentUser: User?
     private var subscribed: Bool = false
     
+    @objc public convenience override init() {
+        self.init(app: FirebaseApp.app()!, collectionPath:"user-devices");
+    }
+    
     @objc public convenience init(app: FirebaseApp) {
         self.init(app: app, collectionPath:"user-devices");
     }
@@ -161,17 +165,6 @@ import FirebaseMessaging
             TYPE_FIELD: "iOS"
         ];
         return device;
-    }
-
-    private func createUserDevices(_ userId: String, _ token: String) -> [String: Any] {
-        let deviceId = getDeviceId();
-        let devices: [String: [String: String]] = [deviceId: createDevice(deviceId, token)];
-        
-        let userDevices: [String: Any] = [
-            DEVICES_FIELD: devices,
-            USER_ID_FIELD: userId,
-        ];
-        return userDevices;
     }
 
     private func getDeviceId() -> String {

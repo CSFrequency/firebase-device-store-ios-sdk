@@ -101,7 +101,7 @@ Create a new DeviceStore.
 
 Parameters:
 
-- `app`: `FirebaseApp` the Firebase App to use.
+- `app`: `FirebaseApp` (Optional) the Firebase App to use. Defaults to the default Firebase App.
 - `collectionPath`: (Optional) `string` the Cloud Firestore collection where devices should be stored. Defaults to `user-devices`.
 
 Returns a `FirebaseDeviceStore`.
@@ -114,7 +114,7 @@ This can't be done automatically with `onAuthStateChanged` as the user is alread
 
 Parameters:
 
-- `completion`: `(Error?) -> Void` a callback handler which will return an `Error` if signing out wasn't successful, or `nil` otherwise
+- `completion`: `(Error?) -> Void` a callback handler which will be called with an `Error` if signing out wasn't successful, or `nil` otherwise
 
 #### `subscribe(completion: (Error?) -> Void): void`
 
@@ -122,12 +122,12 @@ Subscribe a device store to the Firebase App. This will:
 
 1. Request appropriate Notification permissions, if they have not already been granted
 2. Subscribe to Firebase Auth and listen to changes in authentication state
-3. Subscribe to Firebase Messaging and listen to changes in the FCM token
+3. Subscribe to Firebase Cloud Messaging and listen to changes in the FCM token
 4. Automatically store device and FCM token information in the Cloud Firestore collection you specify
 
 Parameters:
 
-- `completion`: `(Error?) -> Void` a callback handler which will return an `Error` if the susbcription wasn't successful, or `nil` otherwise
+- `completion`: `(Error?) -> Void` a callback handler which will be called with an `Error` if the susbcription wasn't successful, or `nil` otherwise
 
 #### `unsubscribe(): void`
 
@@ -141,7 +141,7 @@ Create a new DeviceStore.
 
 Parameters:
 
-- `app`: `FirebaseApp` the Firebase App to use.
+- `app`: `FirebaseApp` (Optional) the Firebase App to use. Defaults to the default Firebase App.
 - `collectionPath`: (Optional) `string` the Cloud Firestore collection where devices should be stored. Defaults to `user-devices`.
 
 Returns a `FirebaseDeviceStore`.
@@ -162,7 +162,7 @@ Subscribe a device store to the Firebase App. This will:
 
 1. Request appropriate Notification permissions, if they have not already been granted
 2. Subscribe to Firebase Auth and listen to changes in authentication state
-3. Subscribe to Firebase Messaging and listen to changes in the FCM token
+3. Subscribe to Firebase Cloud Messaging and listen to changes in the FCM token
 4. Automatically store device and FCM token information in the Cloud Firestore collection you specify
 
 Parameters:
