@@ -6,11 +6,53 @@ Automatically store Device and FCM Token information for Firebase Auth Users in 
 
 ## Installation
 
-TODO
+Add `FirebaseDeviceStore` to your `Podfile`:
+
+```
+pod 'FirebaseDeviceStore'
+```
+
+### Objective-C
+
+Make sure you have `use_frameworks!` enabled in your `Podfile`
 
 ## Example usage
 
-TODO
+### Swift
+
+Import the library:
+
+```
+import FirebaseDeviceStore
+```
+
+Initialise the library:
+
+```
+let deviceStore = FirebaseDeviceStore.init(app: FirebaseApp.app()!);
+// Subscribe to the device store and ensure that appropriate notification permissions are granted
+deviceStore.subscribe { (error) in
+  // Handle permission errors here
+}
+```
+
+### Objective-C
+
+Import the library:
+
+```
+#import "FirebaseDeviceStore-Swift.h"
+```
+
+Initialise the library:
+
+```
+FirebaseDeviceStore *deviceStore = [[FirebaseDeviceStore alloc] initWithApp:[FIRApp defaultApp]];
+// Subscribe to the device store and ensure that appropriate notification permissions are granted
+[deviceStore subscribe:^(NSError * _Nullable error) {
+  // Handle permission errors here
+}];
+```
 
 ## Documentation
 
@@ -30,7 +72,11 @@ The structure of this Document is as follows:
 
 ```
 {
-  devices: Device[],
+  devices: {
+    deviceId1: Device,
+    deviceId2: Device,
+    ...
+  },
   userId: string,
 }
 ```
@@ -47,34 +93,83 @@ A `Device` object contains the following:
 }
 ```
 
-### API
+### API (Swift)
 
-#### `FirebaseDeviceStore(app, collectionPath)`
+#### `FirebaseDeviceStore.init(app: FIRApp, collectionPath: String?)`
 
 Create a new DeviceStore.
 
 Parameters:
 
-- `app`: `FirebaseApp` the Firebase App to use.
+- `app`: `FirebaseApp` (Optional) the Firebase App to use. Defaults to the default Firebase App.
 - `collectionPath`: (Optional) `string` the Cloud Firestore collection where devices should be stored. Defaults to `user-devices`.
 
 Returns a `FirebaseDeviceStore`.
 
-#### `FirebaseDeviceStore.signOut(): void`
+#### `signOut(completion: (Error?) -> Void): void`
 
 Indicate to the DeviceStore that the user is about to sign out, and the current device token should be removed.
 
-This cannot be done automatically with `onAuthStateChanged` as the user won't have permission to remove the token from Firestore as they are already signed out by this point and the Cloud Firestore security rules will prevent the database deletion.
+This can't be done automatically with `onAuthStateChanged` as the user is already signed out at this point. This means the Cloud Firestore security rules will prevent the database deletion as they no longer have the correct user permissions to remove the token.
 
-#### `FirebaseDeviceStore.subscribe(): void`
+Parameters:
+
+- `completion`: `(Error?) -> Void` a callback handler which will be called with an `Error` if signing out wasn't successful, or `nil` otherwise
+
+#### `subscribe(completion: (Error?) -> Void): void`
 
 Subscribe a device store to the Firebase App. This will:
 
-1. Subscribe to Firebase Auth and listen to changes in authentication state
-2. Subscribe to Firebase Messaging and listen to changes in the FCM token
-3. Automatically store device and FCM token information in the Cloud Firestore collection you specify
+1. Request appropriate Notification permissions, if they have not already been granted
+2. Subscribe to Firebase Auth and listen to changes in authentication state
+3. Subscribe to Firebase Cloud Messaging and listen to changes in the FCM token
+4. Automatically store device and FCM token information in the Cloud Firestore collection you specify
 
-#### `FirebaseDeviceStore.unsubscribe(): void`
+Parameters:
+
+- `completion`: `(Error?) -> Void` a callback handler which will be called with an `Error` if the susbcription wasn't successful, or `nil` otherwise
+
+#### `unsubscribe(): void`
+
+Unsubscribe the device store from the Firebase App.
+
+### API (Objective-C)
+
+#### `[FirebaseDeviceStore initWithApp: FIRApp collectionPath: NSString]`
+
+Create a new DeviceStore.
+
+Parameters:
+
+- `app`: `FirebaseApp` (Optional) the Firebase App to use. Defaults to the default Firebase App.
+- `collectionPath`: (Optional) `string` the Cloud Firestore collection where devices should be stored. Defaults to `user-devices`.
+
+Returns a `FirebaseDeviceStore`.
+
+#### `signOut:(void (^ _Nonnull)(NSError * _Nullable))completion: void`
+
+Indicate to the DeviceStore that the user is about to sign out, and the current device token should be removed.
+
+This can't be done automatically with `onAuthStateChanged` as the user is already signed out at this point. This means the Cloud Firestore security rules will prevent the database deletion as they no longer have the correct user permissions to remove the token.
+
+Parameters:
+
+- `completion`: `(void (^ _Nonnull)(NSError * _Nullable))` a callback handler which will return an `Error` if signing out wasn't successful, or `nil` otherwise
+
+#### `subscribe:(void (^ _Nonnull)(NSError * _Nullable))completion: void`
+
+Subscribe a device store to the Firebase App. This will:
+
+1. Request appropriate Notification permissions, if they have not already been granted
+2. Subscribe to Firebase Auth and listen to changes in authentication state
+3. Subscribe to Firebase Cloud Messaging and listen to changes in the FCM token
+4. Automatically store device and FCM token information in the Cloud Firestore collection you specify
+
+Parameters:
+
+- `completion`: `(void (^ _Nonnull)(NSError * _Nullable))` a callback handler which will return an `Error` if the susbcription wasn't successful, or `nil` otherwise
+
+#### `unsubscribe: void`
 
 Unsubscribe the device store from the Firebase App.
 

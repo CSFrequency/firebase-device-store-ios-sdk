@@ -16,7 +16,7 @@ Pod::Spec.new do |s|
   #
 
   s.name         = "FirebaseDeviceStore"
-  s.version      = "0.0.1"
+  s.version      = "0.1.0"
   s.summary      = "Automatically store Device and FCM token information for Firebase Auth users in Cloud Firestore."
 
   # This description is used to generate tags and improve search results.
@@ -81,7 +81,7 @@ Pod::Spec.new do |s|
   #  Supports git, hg, bzr, svn and HTTP.
   #
 
-  s.source       = { :git => "http://github.com/csfrequency/firebase-device-store-ios-sdk.git", :tag => "#{s.version}" }
+  s.source       = { :git => "https://github.com/csfrequency/firebase-device-store-ios-sdk.git", :tag => "v#{s.version}" }
 
 
   # ――― Source Code ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――― #
@@ -92,7 +92,6 @@ Pod::Spec.new do |s|
   #  Not including the public_header_files will make all headers public.
   #
 
-  s.public_header_files = "FirebaseDeviceStore/*.h"
   s.source_files  = "FirebaseDeviceStore/*.{h,swift}"
 
 

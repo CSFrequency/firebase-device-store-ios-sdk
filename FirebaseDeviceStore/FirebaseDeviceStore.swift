@@ -7,7 +7,7 @@ import FirebaseFirestore
 import FirebaseInstanceID
 import FirebaseMessaging
 
-public class FirebaseDeviceStore: NSObject, MessagingDelegate {
+@objc public class FirebaseDeviceStore: NSObject {
     private let DEFAULT_COLLECTION_PATH: String = "user-devices"
     private let DEVICE_ID_FIELD: String = "deviceId"
     private let DEVICES_FIELD: String = "devices"
@@ -26,41 +26,64 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
     private var currentToken: String?
     private var currentUser: User?
     private var subscribed: Bool = false
-
-    public init(app: FirebaseApp, collectionPath: String = "user-devices") {
+    
+    @objc public convenience override init() {
+        self.init(app: FirebaseApp.app()!, collectionPath:"user-devices");
+    }
+    
+    @objc public convenience init(app: FirebaseApp) {
+        self.init(app: app, collectionPath:"user-devices");
+    }
+    
+    @objc public init(app: FirebaseApp, collectionPath: String) {
         self.auth = Auth.auth(app: app);
         self.collectionPath = collectionPath;
         self.firestore = Firestore.firestore(app: app);
         self.instanceId = InstanceID.instanceID();
 
         super.init();
-        Messaging.messaging().delegate = self;
+        
+        let center = NotificationCenter.default
+        center.addObserver(self,
+                           selector: #selector(onFCMTokenRefreshed),
+                           name: Notification.Name.MessagingRegistrationTokenRefreshed,
+                           object: nil)
     }
-
-    // FIRMessaging delegate implementation
-    public func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String) {
+    
+    @objc func onFCMTokenRefreshed(_ notification:Notification) {
         // Ignore token changes if the store isn't subscribed
         if (!subscribed) {
             return;
         }
+        
+        // Get the current token
+        let fcmToken = Messaging.messaging().fcmToken;
+        
         // If the token has changed, then update it
-        if (fcmToken != currentToken && currentUser != nil) {
-            updateDevice(currentUser!.uid, fcmToken);
+        if (fcmToken != nil && fcmToken != self.currentToken && self.currentUser != nil) {
+            updateDevice(self.currentUser!.uid, fcmToken!, completion: {_ in });
         }
         // Update the cached token
-        currentToken = fcmToken;
+        self.currentToken = fcmToken;
     }
 
-    public func signOut() {
+    @objc public func signOut(_ completion: @escaping (Error?) -> Void) {
         if (currentUser != nil && currentToken != nil) {
-            deleteDevice(currentUser!.uid);
+            // Store the UID before we clear the user and delete the device
+            let uid = currentUser!.uid;
+            currentUser = nil;
+            deleteDevice(uid, completion: completion);
+        } else {
+            // Clear the cached user
+            currentUser = nil;
+            completion(nil);
         }
-        // Clear the cached user
-        currentUser = nil;
     }
 
-    public func subscribe(_ handler: @escaping (Bool) -> Void) {
+    @objc public func subscribe(_ completion: @escaping (Error?) -> Void) {
+        // Prevent duplicate subscriptions
         if (subscribed) {
+            completion(nil);
             return;
         }
 
@@ -68,14 +91,26 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
         let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
         UNUserNotificationCenter.current().requestAuthorization(options: authOptions) { (authorized, error) in
             if (!authorized) {
-                handler(false);
+                completion(error);
             } else {
                 self.doSubscribe();
-                handler(true);
+                completion(nil);
             }
         }
     }
 
+    @objc public func unsubscribe() {
+        if (authSubscription != nil) {
+            auth.removeStateDidChangeListener(authSubscription!);
+            authSubscription = nil;
+        }
+        // Reset state
+        currentToken = nil;
+        currentUser = nil;
+        // Clear subscription flag
+        subscribed = false;
+    }
+    
     private func doSubscribe() {
         subscribed = true;
 
@@ -88,16 +123,18 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
                 self.currentToken = result!.token;
 
                 if (self.currentToken != nil && self.currentUser != nil) {
-                    self.updateDevice(self.currentUser!.uid, self.currentToken!);
+                    self.updateDevice(self.currentUser!.uid, self.currentToken!, completion: {_ in });
                 }
             }
         }
 
         authSubscription = auth.addStateDidChangeListener { (auth, user) in
-            if (user != nil && self.currentUser == nil && self.currentToken != nil) {
+            if (user != nil && self.currentUser == nil) {
                 self.currentUser = user;
-
-                self.updateDevice(self.currentUser!.uid, self.currentToken!);
+                
+                if (self.currentToken != nil) {
+                    self.updateDevice(self.currentUser!.uid, self.currentToken!, completion: {_ in });
+                }
             } else if (user == nil && self.currentUser != nil) {
                 // TODO: Log Warning
                 // You need to call the `logout` method on the DeviceStore before logging out the user
@@ -108,90 +145,20 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
         }
     }
 
-    public func unsubscribe() {
-        if (authSubscription != nil) {
-            auth.removeStateDidChangeListener(authSubscription!);
-            authSubscription = nil;
-        }
-        // Reset state
-        currentToken = nil;
-        currentUser = nil;
-        // Clear subscription flag
-        subscribed = false;
-    }
-
-    private func deleteDevice(_ userId: String) {
+    private func deleteDevice(_ userId: String, completion: @escaping (Error?) -> Void) {
         let docRef = userRef(userId);
-
-        firestore.runTransaction({ (transaction, errorPointer) -> Any? in
-            let doc: DocumentSnapshot;
-            do {
-                try doc = transaction.getDocument(docRef);
-            } catch let fetchError as NSError {
-                errorPointer?.pointee = fetchError
-                return nil;
-            }
-
-            if (doc.exists) {
-                var devices = self.getDevices(doc);
-                // Remove the old device
-                devices = self.removeCurrentDevice(devices);
-                // Update the document
-                transaction.updateData([self.DEVICES_FIELD: devices], forDocument: docRef);
-            } else {
-                let devices = self.createUserDevices(userId, nil);
-                transaction.setData(devices, forDocument: docRef);
-            }
-            return nil;
-        }) { (object, error) in
-            // TODO: Logging
-        }
+        docRef.updateData([FieldPath.init([self.DEVICES_FIELD, self.getDeviceId()]): FieldValue.delete()], completion: completion);
     }
 
-    private func updateDevice(_ userId: String, _ token: String) {
+    private func updateDevice(_ userId: String, _ token: String, completion: @escaping (Error?) -> Void) {
         let docRef = userRef(userId);
-
-        firestore.runTransaction({ (transaction, errorPointer) -> Any? in
-            let doc: DocumentSnapshot;
-            do {
-                try doc = transaction.getDocument(docRef);
-            } catch let fetchError as NSError {
-                errorPointer?.pointee = fetchError
-                return nil;
-            }
-            if (doc.exists) {
-                var devices = self.getDevices(doc);
-                if (self.containsCurrentDevice(devices)) {
-                    // Update the device token if it already exists
-                    self.updateCurrentDevice(devices, token);
-                } else {
-                    devices.append(self.createCurrentDevice(token));
-                }
-                // Update the document
-                transaction.updateData([self.DEVICES_FIELD: devices], forDocument: docRef);
-            } else {
-                let devices = self.createUserDevices(userId, token);
-                transaction.setData(devices, forDocument: docRef);
-            }
-            return nil;
-        }) { (object, error) in
-            // TODO: Logging
-        }
+        let deviceId = self.getDeviceId();
+        docRef.setData([USER_ID_FIELD: userId, DEVICES_FIELD: [deviceId: self.createDevice(deviceId, token)]], merge: true, completion: completion);
     }
 
-    private func containsCurrentDevice(_ devices: [[String: String]]) -> Bool {
-        let deviceId = getDeviceId();
-        for device in devices {
-            if (deviceId == device[DEVICE_ID_FIELD]) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private func createCurrentDevice(_ token: String) -> [String: String] {
+    private func createDevice(_ deviceId: String, _ token: String) -> [String: String] {
         let device: [String: String] = [
-            DEVICE_ID_FIELD: getDeviceId(),
+            DEVICE_ID_FIELD: deviceId,
             FCM_TOKEN_FIELD: token,
             NAME_FIELD: getDeviceName(),
             OS_FIELD: getOS(),
@@ -200,21 +167,8 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
         return device;
     }
 
-    private func createUserDevices(_ userId: String, _ token: String?) -> [String: Any] {
-        let userDevices: [String: Any] = [
-            DEVICES_FIELD: token == nil ? [] : [createCurrentDevice(token!)],
-            USER_ID_FIELD: userId,
-        ];
-        return userDevices;
-    }
-
     private func getDeviceId() -> String {
         return UIDevice.current.identifierForVendor!.uuidString;
-    }
-
-    private func getDevices(_ snapshot: DocumentSnapshot) -> [[String: String]] {
-        let devices: [[String: String]]? = snapshot.get(DEVICES_FIELD) as? [[String : String]];
-        return devices ?? [];
     }
 
     private func getDeviceName() -> String {
@@ -223,22 +177,6 @@ public class FirebaseDeviceStore: NSObject, MessagingDelegate {
 
     private func getOS() -> String {
         return "iOS " + UIDevice.current.systemVersion;
-    }
-
-    private func removeCurrentDevice(_ devices: [[String: String]]) -> [[String: String]] {
-        let deviceId = getDeviceId();
-        return devices.filter({ (device: [String : String]) -> Bool in
-            return deviceId != device[DEVICE_ID_FIELD];
-        })
-    }
-
-    private func updateCurrentDevice(_ devices: [[String: String]], _ token: String) {
-        let deviceId = getDeviceId();
-        for var device in devices {
-            if (deviceId == device[DEVICE_ID_FIELD]) {
-                device[FCM_TOKEN_FIELD] = token;
-            }
-        }
     }
 
     private func userRef(_ userId: String) -> DocumentReference {
